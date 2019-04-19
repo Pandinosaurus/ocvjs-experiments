@@ -168,6 +168,8 @@ function process(){
         orb.compute(tmp, 
                     imageObject['keypoints'], 
                     imageObject['descriptors']);
+        imageObject['descriptors'].convertTo(imageObject['descriptors'], cv.CV_32F); //for flann based
+        
         if(imageObject['keypoints'].size() == 0)
         { 
             tmp.delete(); 
@@ -199,7 +201,7 @@ function process(){
         }
 
         // Clean the mess
-        kmatches.delete();
+        // kmatches.delete();
 
         // Return good matches
         return good_kmatches;
