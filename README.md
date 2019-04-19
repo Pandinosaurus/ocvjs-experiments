@@ -1,15 +1,10 @@
 # ocvjs-experiments
-"Let's leverage the power of OpenCV in javascript to painlessly create efficient multiplatform applications."
-
 This repository demonstrates serverless, client-side, computer vision experiments with opencvjs (and webgl in the future).
-
 Please, consider this repository as a complement to the official (but somewhat quite basic) opencvjs exemples.
 
 
 # Available experiments
-Each experiment has its own opencv folder with opencv.js (wasm) and utils.js.
-
-All applications should work on Windows, MacOS, iOS, Android and Linux with a HTML5 & WASM compatible browser.
+Each experiment has its own opencv folder with opencv.js (wasm) and utils.js. All experiments should work on Windows, MacOS, iOS, Android and Linux with a HTML5 & WASM compatible browser.
 
 
 * ocvjs-PlanAR : Augmented reality based on textured object pose estimation on the web (client side only)
