@@ -89,10 +89,10 @@ function process(){
     const FPS = 30;
 
     // Orb keypoints detector & descriptor (extractor)
-    var orb = new cv.ORB(2000);
+    var orb = new cv.ORB(1200, 1.2, 8);
 
     // Keypoints matcher
-    var bf_matcher = new cv.DescriptorMatcher("BruteForce-Hamming");
+    var bf_matcher = new cv.DescriptorMatcher("FlannBased"); //previous: BruteForce-Hamming
 
     // Reference image to find in video frames
     // We embed the whole thing in an object to profit from the kind of 
