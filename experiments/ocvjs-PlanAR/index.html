@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hello OpenCV.js</title>
+</head>
+<body>
+<h2>ocvjs-PlanAR</h2>
+<p id="status">OpenCV.js is loading...</p>
+<div>
+    <div class="control"><button id="startAndStop" disabled>Start</button></div>
+</div>
+<p class="err" id="errorMessage"></p>
+<div>
+    <table cellpadding="0" cellspacing="0" width="0" border="0">
+    <tr>
+        <td>
+            <video id="videoInput" width=1080 height=960 hidden></video>
+        </td>
+        <td>
+            <canvas id="canvasFrame" width=640 height=480></canvas>
+        </td>
+        <td>
+            <canvas id="canvasReference" width=320 height=240></canvas>
+        </td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>
+            <div class="caption" hidden>videoInput</div>
+        </td>
+        <td>
+            <div class="caption">canvasFrame</div>
+        </td>
+        <td>
+            <div class="caption">canvasReference</div>
+        </td>
+        <td></td>
+        <td></td>
+    </tr>
+    </table>
+    <img id="reference" src="data/magazine.png" hidden/> 
+</div>
+<script src="opencv/utils.js" type="text/javascript"></script>
+<script type="text/javascript">
+// Check for wasm support.
+if (!('WebAssembly' in window)) {
+  alert('you need a browser with wasm support enabled :(');
+}
+
+// Start experiment
+let utils = new Utils('errorMessage');
+let streaming = false;
+let videoInput = document.getElementById('videoInput');
+let startAndStop = document.getElementById('startAndStop');
+let canvasFrame = document.getElementById('canvasFrame');
+let canvasContext = canvasFrame.getContext('2d');
+
+startAndStop.addEventListener('click', () => {
+    if (!streaming) {
+        utils.clearError();
+        utils.startCamera('qvga', onVideoStarted, 'videoInput');
+    } else {
+        utils.stopCamera();
+        onVideoStopped();
+    }
+});
+
+function onVideoStarted() {
+    streaming = true;
+    startAndStop.innerText = 'Stop';
+    videoInput.width = videoInput.videoWidth;
+    videoInput.height = videoInput.videoHeight;
+    process();
+}
+
+function onVideoStopped() {
+    streaming = false;
+    canvasContext.clearRect(0, 0, canvasFrame.width, canvasFrame.height);
+    startAndStop.innerText = 'Start';
+}
+
+// ToDo : create an ImageObject class for refObject and sceneObject
+function process(){
+    // Camera abstraction
+    let video = document.getElementById('videoInput');
+    let cap = new cv.VideoCapture(video);
+    const FPS = 30;
+
+    // Orb keypoints detector & descriptor (extractor)
+    var orb = new cv.ORB(2000);
+
+    // Keypoints matcher
+    var bf_matcher = new cv.DescriptorMatcher("BruteForce-Hamming");
+
+    // Reference image to find in video frames
+    // We embed the whole thing in an object to profit from the kind of 
+    // pass by reference capability of Javascript
+    let reference = cv.imread(document.getElementById('reference'));
+    var reference_keypoints = new cv.KeyPointVector();
+    var reference_descriptors = new cv.Mat();
+    var referenceObject = { img: reference, 
+                            keypoints: reference_keypoints,
+                            descriptors: reference_descriptors };
+    var reference_corners_mat = new cv.Mat(4,1, cv.CV_32FC2);
+    reference_corners_mat.floatPtr(0, 0)[0] = 0; //(row, col)[channel]
+    reference_corners_mat.floatPtr(0, 0)[1] = 0;
+    reference_corners_mat.floatPtr(1, 0)[0] = reference.cols;
+    reference_corners_mat.floatPtr(1, 0)[1] = 0;
+    reference_corners_mat.floatPtr(2, 0)[0] = reference.cols;
+    reference_corners_mat.floatPtr(2, 0)[1] = reference.rows;
+    reference_corners_mat.floatPtr(3, 0)[0] = 0;
+    reference_corners_mat.floatPtr(3, 0)[1] = reference.rows;
+
+    // Current frame, in which we would like to find the reference image
+    // We embed the whole thing in an object to profit from the kind of 
+    // pass by reference capability of Javascript
+    let frame = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+    var frame_keypoints = new cv.KeyPointVector();
+    var frame_descriptors = new cv.Mat();
+    var sceneObject = { img: frame, 
+                        keypoints: frame_keypoints,
+                        descriptors: frame_descriptors };
+
+    
+    function detectAndComputeKeypointsOnImageObject(imageObject)
+    {
+        // Let's work on a temporary matrix
+        var tmp = new cv.Mat();
+
+        // Return if image has not been read or allocated
+        if(imageObject['img'].empty())
+        { 
+            tmp.delete(); 
+            return; 
+        }
+
+        // Convert image in RGB color space, assuming it is in RGBA
+        try
+        {
+            cv.cvtColor(imageObject['img'], 
+                        tmp, 
+                        cv.COLOR_RGBA2RGB);
+        }
+        catch(err)
+        {
+            console.log(err);
+            tmp = imageObject['img'];
+        }
+        if(tmp.empty())
+        { 
+            tmp.delete(); 
+            return; 
+        }
+
+        // Find keypoints
+        orb.detect(tmp, 
+                   imageObject['keypoints'], 
+                   new cv.Mat());
+        if(imageObject['keypoints'].size() == 0)
+        { 
+            tmp.delete(); 
+            return; 
+        }
+
+        // Compute descriptors
+        orb.compute(tmp, 
+                    imageObject['keypoints'], 
+                    imageObject['descriptors']);
+        if(imageObject['keypoints'].size() == 0)
+        { 
+            tmp.delete(); 
+            return; 
+        }
+        
+        // Clear tmp memory and return
+        tmp.delete(); 
+        return;
+    };
+
+    // Perform a ratio test on matched keypoints
+    function ratioTest(kmatches, ratio=0.80, maxDist=100)
+    {
+        // Construct
+        var good_kmatches = new cv.DMatchVector();
+
+        // Perform ration test
+        for(var i = 0; i < kmatches.size(); i++)
+        {
+            var distance_first  = kmatches.get(i).get(0)['distance'];
+            var distance_second = kmatches.get(i).get(1)['distance'];
+            if(distance_first < ratio*distance_second && distance_first < maxDist)
+            {
+                good_kmatches.push_back(kmatches.get(i).get(0));
+            }
+            delete distance_first;
+            delete distance_second;
+        }
+
+        // Clean the mess
+        kmatches.delete();
+
+        // Return good matches
+        return good_kmatches;
+    };
+
+
+    function matchKeypoints(imageObjectScene, imageObjectReference)
+    {
+        // Construct
+        var kmatches = new cv.DMatchVectorVector();
+        
+        // match
+        bf_matcher.knnMatch(imageObjectScene['descriptors'], 
+                            imageObjectReference['descriptors'], 
+                            kmatches,
+                            2); //2 neighbors
+        
+        // Return good matches after ratio test
+        return ratioTest(kmatches);
+    }
+
+    function getCoordinatesOfGoodMatchKeypoints(imageObject, goodMatches, indexType)
+    {   
+        // Retrieve points from good matching keypoints
+        var pts = new cv.PointVector();
+
+        if(indexType == 'trainIdx')
+        {
+            for(var i = 0; i < goodMatches.size(); i++)
+            {
+                var idx = goodMatches.get(i).trainIdx;
+                pts.push_back(imageObject['keypoints'].get(idx)['pt']);
+            }
+            return pts;
+        }
+        else if(indexType == 'queryIdx')
+        {
+            for(var i = 0; i < goodMatches.size(); i++)
+            {
+                var idx = goodMatches.get(i).queryIdx;
+                pts.push_back(imageObject['keypoints'].get(idx)['pt']);
+            }
+            return pts;
+        }
+        else
+        {
+            throw('Error in getGoodMatchingKeypointsCoordinates.',
+                  'IndexType should be trainIdx or queryIdx');
+            return pts;
+        }
+        return pts;
+    }
+
+    // Convert a PointVector to a cv.Mat
+    // cv.Mat will have 1 column, n rows, 2 channels c1 and c2
+    //  [c1]:x ; [c2]:y
+    // ToDo : make type available to user
+    function convertPointVectorToMat(pointVector)
+    {
+        var mat = new cv.Mat(pointVector.size(), 
+                             1,
+                             cv.CV_32FC2);
+        
+        for(var row = 0; row < pointVector.size(); row++)
+        {
+            mat.floatPtr(row, 0)[0] = pointVector.get(row)['x'];
+            mat.floatPtr(row, 0)[1] = pointVector.get(row)['y'];
+        }
+
+        return mat;
+    }
+
+    // Find homography
+    // Step 1 : acquire set of points from keypoints
+    // Step 2 : estimate homography with set of points
+    //          plus RANSAC like algorithm
+    //          ^-- perfomed with jsfeat
+    function getHomographyBetweenImageObjects(imageObjectScene, imageObjectReference)
+    {
+        var H = new cv.Mat();
+
+        // Match
+        var good_kmatches = matchKeypoints(imageObjectScene, 
+                                           imageObjectReference);
+
+        if(good_kmatches.size() > 30)
+        {   
+            // Get keypoints coordinates (points)
+            var reference_pts = getCoordinatesOfGoodMatchKeypoints(imageObjectReference, 
+                                                                   good_kmatches, 
+                                                                   'trainIdx');
+            var frame_pts = getCoordinatesOfGoodMatchKeypoints(imageObjectScene, 
+                                                               good_kmatches, 
+                                                               'queryIdx');
+
+            // Convert them to cv.Mat
+            var mat_ref = convertPointVectorToMat(reference_pts);
+            var mat_frame = convertPointVectorToMat(frame_pts);
+
+            // Actually find the homography
+            var H = cv.findHomography(mat_ref, 
+                                      mat_frame, 
+                                      cv.RANSAC);
+            
+            // Cleanup the mess
+            reference_pts.delete();
+            frame_pts.delete();   
+            mat_ref.delete();
+            mat_frame.delete();
+        }
+        good_kmatches.delete();
+
+        return H;
+
+    }
+
+    function drawBoxOnImageObject(imageObject, corners)
+    {
+        //-- Draw lines between the corners
+        cv.line(imageObject['img'], 
+                new cv.Point(corners.floatPtr(0,0)[0], 
+                             corners.floatPtr(0,0)[1]),
+                new cv.Point(corners.floatPtr(1,0)[0], 
+                             corners.floatPtr(1,0)[1]), 
+                new cv.Scalar(0, 255, 0), 4 );
+        cv.line(imageObject['img'], 
+                new cv.Point(corners.floatPtr(1,0)[0], 
+                             corners.floatPtr(1,0)[1]),
+                new cv.Point(corners.floatPtr(2,0)[0], 
+                             corners.floatPtr(2,0)[1]), 
+                new cv.Scalar(0, 255, 0), 4 );
+        cv.line(imageObject['img'], 
+                new cv.Point(corners.floatPtr(2,0)[0], 
+                             corners.floatPtr(2,0)[1]),
+                new cv.Point(corners.floatPtr(3,0)[0], 
+                             corners.floatPtr(3,0)[1]), 
+                new cv.Scalar(0, 255, 0), 4 );
+        cv.line(imageObject['img'], 
+                new cv.Point(corners.floatPtr(3,0)[0], 
+                             corners.floatPtr(3,0)[1]),
+                new cv.Point(corners.floatPtr(0,0)[0], 
+                             corners.floatPtr(0,0)[1]), 
+                new cv.Scalar(0, 255, 0), 4 );
+    }
+
+    function drawImageObjectWithKeypoints(imageObject, canvas, withKeypoint=true)
+    {
+        // Let's work on a temporary matrix
+        var tmp = imageObject['img'].clone();
+
+        // Return if image has not been read or allocated
+        if(imageObject['img'].empty())
+        { 
+            tmp.delete(); 
+            return; 
+        }
+
+        // There is no need to check for keypoints' existence
+        // If there is none, for loop will simply be cancelled
+        if(withKeypoint)
+        {
+            for(var i=0; i<imageObject['keypoints'].size(); i++)
+            {
+                // Draw a circle at keypoints' (x,y) location
+                var x = Math.floor(imageObject['keypoints'].get(i)['pt']['x']);
+                var y = Math.floor(imageObject['keypoints'].get(i)['pt']['y']);
+                var pt = new cv.Point(x,y);
+                var color = new cv.Scalar(255,0,0);
+                cv.circle(tmp, 
+                        pt ,
+                        3,
+                        color );
+
+                // Clean memory
+                delete x;
+                delete y;
+                delete pt;
+                delete color;
+            }
+
+        }
+        
+        // Display the resulting frame in the specified canvas
+        cv.imshow(canvas, tmp);
+
+        // Clear tmp memory and return
+        tmp.delete(); 
+        return;
+    };
+
+
+    function processVideo() {
+        try 
+        {
+            if (!streaming) 
+            {
+                // clean and stop.
+                reference.delete();
+                reference_keypoints.delete();
+                reference_descriptors.delete();
+                reference_corners_mat.delete();
+
+                frame.delete();
+                frame_keypoints.delete();
+                frame_descriptors.delete();
+
+                orb.delete();
+                bf_matcher.delete();
+                
+                return;
+            }
+
+            // start
+            let begin = Date.now();
+
+            // Read camera stream
+            cap.read(sceneObject['img']);
+
+            // Find keypoints from current frame
+            // Note: keypoints from reference image have already been detected
+            detectAndComputeKeypointsOnImageObject(sceneObject);
+
+            // Estimate homography and apply it on reference image corners
+            // to project them in the scene (akka scene_corners)
+            var H = getHomographyBetweenImageObjects(sceneObject, referenceObject);
+            var scene_corners = new cv.Mat();
+            if(!H.empty())
+            {
+                cv.perspectiveTransform(reference_corners_mat, scene_corners, H);
+            }
+
+            // Display ! :D
+            if(!scene_corners.empty()){
+                drawBoxOnImageObject(sceneObject, scene_corners);
+            }
+            drawImageObjectWithKeypoints(sceneObject, 'canvasFrame', false);
+            drawImageObjectWithKeypoints(referenceObject, 'canvasReference');
+
+            // Clean the mess
+            H.delete();
+            scene_corners.delete();
+
+            // schedule next start
+            let delay = 1000/FPS - (Date.now() - begin);
+            setTimeout(processVideo, delay);
+
+        } 
+        catch (err) 
+        {
+            utils.printError(err);
+        }
+    };
+
+    // Detect keypoints on reference image
+    setTimeout(detectAndComputeKeypointsOnImageObject(referenceObject),0);
+    // schedule processing of first frame
+    setTimeout(processVideo, 0);
+}
+
+utils.loadOpenCv(() => {
+    startAndStop.removeAttribute('disabled');
+    document.getElementById('status').innerText = 'OpenCV is Ready !';
+});
+</script>
+</body>
+</html>
