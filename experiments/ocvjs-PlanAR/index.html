@@ -180,7 +180,7 @@ function process(){
     };
 
     // Perform a ratio test on matched keypoints
-    function ratioTest(kmatches, ratio=0.80, maxDist=100)
+    function ratioTest(kmatches, ratio=0.80, maxDist=9999)
     {
         // Construct
         var good_kmatches = new cv.DMatchVector();
