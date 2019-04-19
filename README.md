@@ -29,7 +29,7 @@ git clone https://github.com/Pandinosaurus/ocvjs-experiments
 cd ocvjs-experiments
 ```
 
-4) Go into one of the experiments folders:
+4) Go into the experiments folders:
 
 ```
 cd experiments
