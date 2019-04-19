@@ -28,7 +28,7 @@ Download the repository, enter one of the experiments folder and open the index.
 2) Clone the repository:
 
 ```
-git clone repository
+git clone https://github.com/Pandinosaurus/ocvjs-experiments
 ```
 
 3) Go into the downloaded folder:
