@@ -72,8 +72,8 @@ startAndStop.addEventListener('click', () => {
 function onVideoStarted() {
     streaming = true;
     startAndStop.innerText = 'Stop';
-    videoInput.width = videoInput.videoWidth;
-    videoInput.height = videoInput.videoHeight;
+    videoInput.width = 320; //videoInput.videoWidth;
+    videoInput.height = 240;//videoInput.videoHeight;
     process();
 }
 
