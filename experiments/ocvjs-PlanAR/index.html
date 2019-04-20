@@ -418,6 +418,7 @@ function process(){
 
             // Read camera stream
             cap.read(sceneObject['img']);
+            cv.resize(sceneObject['img'], sceneObject['img'], new cv.Size(320, 240));
 
             // start
             let begin = Date.now();
