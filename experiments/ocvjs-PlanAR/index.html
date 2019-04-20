@@ -119,7 +119,7 @@ function process(){
     // We embed the whole thing in an object to profit from the kind of 
     // pass by reference capability of Javascript
     let frame = new cv.Mat(video.height, video.width, cv.CV_8UC4);
-    let frameSmall = new cv.Mat(320, 240, cv.CV_8UC4);
+    let frameSmall = new cv.Mat(240, 320, cv.CV_8UC4);
     var frame_keypoints = new cv.KeyPointVector();
     var frame_descriptors = new cv.Mat();
     var sceneObject = { imgReal: frame, 
@@ -420,7 +420,7 @@ function process(){
 
             // Read camera stream
             cap.read(sceneObject['imgReal']);
-            cv.resize(sceneObject['imgReal'], sceneObject['img'], new cv.Size(320, 240));
+            cv.resize(sceneObject['imgReal'], sceneObject['img'], new cv.Size(300, 240));
 
             // start
             let begin = Date.now();
