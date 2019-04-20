@@ -10,6 +10,7 @@
 <div>
     <div class="control"><button id="startAndStop" disabled>Start</button></div>
 </div>
+<p id="fpsView"></p>
 <p class="err" id="errorMessage"></p>
 <div>
     <table cellpadding="0" cellspacing="0" width="0" border="0">
@@ -51,6 +52,7 @@ if (!('WebAssembly' in window)) {
 
 // Start experiment
 let utils = new Utils('errorMessage');
+let fpsView = document.getElementById('fpsView');
 let streaming = false;
 let videoInput = document.getElementById('videoInput');
 let startAndStop = document.getElementById('startAndStop');
@@ -414,12 +416,12 @@ function process(){
                 return;
             }
 
-            // start
-            let begin = Date.now();
-
             // Read camera stream
             cap.read(sceneObject['img']);
 
+            // start
+            let begin = Date.now();
+            
             // Find keypoints from current frame
             // Note: keypoints from reference image have already been detected
             detectAndComputeKeypointsOnImageObject(sceneObject);
@@ -444,6 +446,9 @@ function process(){
             H.delete();
             scene_corners.delete();
 
+            // Display speed in fpsView
+            fpsView.innerText = 1000/(Date.now() - begin);
+            
             // schedule next start
             let delay = 1000/FPS - (Date.now() - begin);
             setTimeout(processVideo, delay);
