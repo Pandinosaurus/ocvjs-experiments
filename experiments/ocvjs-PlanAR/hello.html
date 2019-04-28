@@ -343,7 +343,7 @@ function process(){
           reference_corners_mat.floatPtr(2, 0)[1] = reference.rows;
           reference_corners_mat.floatPtr(3, 0)[0] = 0;
           reference_corners_mat.floatPtr(3, 0)[1] = reference.rows;
-          detectAndComputeKeypointsOnImageObject(referenceObject, 3000)
+          detectAndComputeKeypointsOnImageObject(referenceObject, 500)
 
           // Frame
           scene = new cv.Mat(video.height, video.width, cv.CV_8UC4);
@@ -361,7 +361,7 @@ function process(){
       let cap = new cv.VideoCapture(video);
       cap.read(sceneObject['img']);
       cv.resize(sceneObject['img'], sceneObject['img'], new cv.Size(320, 240));
-      detectAndComputeKeypointsOnImageObject(sceneObject, 3000);
+      detectAndComputeKeypointsOnImageObject(sceneObject, 500);
       var H = getHomographyBetweenImageObjects(sceneObject, referenceObject);
       var scene_corners = new cv.Mat();
       if(!H.empty()){
