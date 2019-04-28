@@ -360,7 +360,7 @@ function process(){
 
       let cap = new cv.VideoCapture(video);
       cap.read(sceneObject['img']);
-      cv.resize(sceneObject['img'], sceneObject['img'], new cv.Size(320, 240));
+      //cv.resize(sceneObject['img'], sceneObject['img'], new cv.Size(320, 240));
       detectAndComputeKeypointsOnImageObject(sceneObject, 500);
       var H = getHomographyBetweenImageObjects(sceneObject, referenceObject);
       var scene_corners = new cv.Mat();
