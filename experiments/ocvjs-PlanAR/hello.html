@@ -243,14 +243,14 @@ function matchKeypoints(imageObjectScene, imageObjectReference)
     var matcher = new cv.DescriptorMatcher("FlannBased");
     var kmatches = new cv.DMatchVectorVector();
     
-    // match - slow, critical part, could be improved (multithreaded / webworkers ?)
+    // match - slow
     var k = 1; // nb of neighbors
     matcher.knnMatch(imageObjectScene['descriptors'], 
                      imageObjectReference['descriptors'], 
                      kmatches,
                      k); 
 
-    // Get good matches after ratio test ; // a bit slow, could be improved ?
+    // Get good matches after ratio test
     var out_Points = ratioTestToMat(imageObjectReference, 
                                     imageObjectScene, 
                                     kmatches, 
@@ -271,10 +271,10 @@ function getHomographyBetweenImageObjects(imageObjectScene, imageObjectReference
 {
     var H = new cv.Mat();
 
-    // Match - slow, critical part, could be improved
+    // Match - slow
     var out_Points = matchKeypoints(imageObjectScene, 
                                     imageObjectReference);
-    
+
     // Find Homography if enough points do match
     if(out_Points[0].rows > imageObjectReference['keypoints'].size()/8){
         var H = cv.findHomography(out_Points[0], 
@@ -360,6 +360,7 @@ function process(){
 
       let cap = new cv.VideoCapture(video);
       cap.read(sceneObject['img']);
+      cv.resize(sceneObject['img'], sceneObject['img'], new cv.Size(320, 240));
       detectAndComputeKeypointsOnImageObject(sceneObject, 3000);
       var H = getHomographyBetweenImageObjects(sceneObject, referenceObject);
       var scene_corners = new cv.Mat();
